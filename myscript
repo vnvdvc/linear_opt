@@ -1,0 +1,18 @@
+#PBS -l walltime=24:00:00
+#PBS -l nodes=1:ppn=1
+#PBS -N linear_opt_python
+#PBS -m abe
+#PBS -N x0_${INDEX}
+#PBS -o results_${INDEX}.out
+cd $PBS_O_WORKDIR
+cp linear_opt.py $TMPDIR
+if [ ! -f "$TMPDIR/y98a.txt" ]; then
+    cp coding/fld/* $TMPDIR
+fi
+cd $TMPDIR
+module load python/2.7
+source activate sklearn
+python linear_opt.py ${INDEX}
+if [ -f "./results_${INDEX}_2nd.txt" ]; then
+    cp ./results_${INDEX}_2nd.txt $PBS_O_WORKDIR
+fi
