@@ -126,10 +126,10 @@ class Model(object):
                 if lam.imag != 0.0:
                     raise ValueError("Model.get_qt: Imaginary eigenvalue encountered!")
                 results += coeff_vec[idx]*np.exp(-lam.real*t)
-            return results/np.sum(coeff_vec)      
+            return results/np.sum(coeff_vec)
         return qt
     def get_loss(self,data):
-        self.loss = np.sum((self.qt(data[:,0])-data[:,1])**2)
+        self.loss = np.mean((self.qt(data[:,0])-data[:,1])**2)
 #idx in the restricted set will have zero value in the corresponding idx of grads
 #For example, if the value of nu is fixed for this mutant, then restricted = [0]
     def get_grads(self,data,restricted=[]):
@@ -226,10 +226,10 @@ def scenario(x0s,index):
     taud = 2.6
     num_of_mutants = 4
     initParams = np.zeros(3*num_of_mutants)
-    bounds = [(0.01,3.76),(0.01,1.0),(0.001,10.0)]*num_of_mutants
+    bounds = [(0.01,3.76),(0.01,10.0),(0.001,10.0)]*num_of_mutants
     initialization = [Initialize(x0,cutoff),Initialize(-x0,cutoff)]
-    threshold = 0.0001
-    max_epoch = 5
+    threshold = 1e-10
+    max_epoch = 10
     results = []
     loss = 100.0
     epoch = 0
@@ -239,15 +239,10 @@ def scenario(x0s,index):
             if idx == 0:
                 initNu = rands[0]
             initParams[3*idx:3*idx+3] = np.array([initNu,rands[1],rands[2]*5])
-        if epoch == 0:
-            if index == 0:
-               initParams = np.array([0.9487,0.5159,0.6198,0.9487,0.97,0.92,0.95,0.55,1.26,0.95,0.23,1.86])
-            if index == 5:
-               initParams = np.array([1.51,1.00,1.07,1.51,1.00,0.70,1.51,0.17,2.96,1.51,0.60,1.57])
         opt = Opt(taud,initParams,bounds,datas,initialization,x0s)
-        mins, loss, __ = scipy.optimize.fmin_l_bfgs_b(opt.get_loss,initParams,fprime=opt.get_grads,bounds=opt.bounds,factr=1e7,iprint=0)
+        mins, loss, __ = scipy.optimize.fmin_l_bfgs_b(opt.get_loss,initParams,fprime=opt.get_grads,bounds=opt.bounds,factr=1e6,iprint=0)
         results.append((loss,mins))
-        with open(folder+"results_{}_2nd.txt".format(index),"a+") as out:
+        with open(folder+"results_{}.txt".format(index),"a+") as out:
             out.write("Initial condition x0s:{}\n".format(x0s))
             out.write("Parameters:{}\n".format(mins))
             out.write("loss:{}\n".format(loss))
@@ -257,8 +252,35 @@ def scenario(x0s,index):
         epoch += 1
     return results
 
+def single_fitting(x0s,mutant,datas):
+    taud = 2.6
+    datas = [datas[mutant]]
+    initParams = np.zeros(3)
+    bounds = [(0.01,3.76),(0.01,5.0),(0.001,10.0)]
+    initialization = [Initialize(x0,cutoff),Initialize(-x0,cutoff)]
+    threshold = 1e-10
+    max_epoch = 20
+    results = []
+    loss = 100.0
+    epoch = 0
+    while loss > threshold and epoch < max_epoch:
+        rands = np.random.random_sample((3,))
+        initParams = np.array([3*rands[0],3*rands[1],rands[2]*5])
+        opt = Opt(taud,initParams,bounds,datas,initialization,x0s)
+        mins, loss, __ = scipy.optimize.fmin_l_bfgs_b(opt.get_loss,initParams,fprime=opt.get_grads,bounds=opt.bounds,factr=1e6,iprint=0)
+        results.append((loss,mins))
+        with open(folder+"results_{}".format(mutant_files[mutant]),"a+") as out:
+            out.write("initial condition x0s:{}\n".format(x0s))
+            out.write("parameters:{}\n".format(mins))
+            out.write("loss:{}\n".format(loss))
+        print "initial condition x0s:{}".format(x0s)
+        print "parameters:{}".format(mins)
+        print "loss:{}".format(loss)
+        epoch += 1
+    return results
+
 if __name__ == "__main__":
-    accuracy = 1e-10
+    accuracy = 1e-16
     epsilon = 1e-8
     #Implementation
     #Trial 1:loss = 0.264, nu=0.5420, alpha=0.01, xc=0.001,  x0=0.99 x0s=[++++]
@@ -275,6 +297,7 @@ if __name__ == "__main__":
                 nums = line[:-1].split()
                 data.append((float(nums[0]),float(nums[1])))
         datas.append(np.array(data))
+    """
     x0 = 0.86
     x0s = [x0]*4
     x0s_list = []
@@ -285,4 +308,12 @@ if __name__ == "__main__":
                     x0s_list.append([i*x0,j*x0,k*x0,l*x0])
     index = int(sys.argv[1])
     scenario(x0s_list[index],index)
+    """
+    x0 = 0.86
+    x0s_list = [[0.86],[-0.86]]
+    index = int(sys.argv[1])
+    mutant = int(sys.argv[2])
+    #scenario(x0s_list[index],index)
+    single_fitting(x0s_list[index],mutant,datas)
+
 
